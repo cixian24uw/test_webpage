@@ -1,0 +1,169 @@
+---
+title: "Social Media and Mental Health Dashboard"
+author: "Cixian Huang, Izayah Qiu"
+date: today
+format:
+  dashboard:
+    theme: simplex
+    embed-resources: true
+---
+
+## Topic Overview 
+
+In the age of technology, social media is one of the most dominant forms of communication and entertainment. Platforms such as Instagram, TikTok, and X allow people to share experiences, interact with others, and consume large amounts of content in a short period of time. While these platforms bring many positive benefits, such as connecting with others and raising awareness, researchers and public health experts have also raised concerns about their impact on mental health and emotional well-being. According to the American Psychological Association, excessive social media use has been linked to increased anxiety, depression, and feelings of loneliness, particularly among younger users.
+
+External Link: https://www.apa.org/monitor/2023/09/protecting-teens-on-social-media
+
+Another source, PubMed Central, also agrees that people, specfically teens, "find it difficult to picture their lives without social media." Prolonged use of platforms such as Facebook can lead to depression, anxiety, and stress. But as a counterargument, they claim social media benefits teens by creating opportunities to make friends, discuss ideas, and open a world of exploration.
+
+External Link: https://pmc.ncbi.nlm.nih.gov/articles/PMC10476631/
+
+Our project explores how different patterns of social media use may be related to emotional states and mental well-being. Rather than looking only at how long someone spends online, we analyze several forms of engagement, such as posting, messaging, and receiving likes or comments. To do this, we utilized two public datasets related to social media usage and mental health indicators.
+
+We focus on the following three questions:
+
+**1. Using PHQ-9 & GAD-7 scores, is higher daily social media usage associated with worse overall mental health outcomes?**
+
+**2. Do different types of social media engagement correspond with different emotional outcomes?**
+
+**3. Are there demographic differences, such as age or gender, in how social media use relates to emotional well-being?**
+
+Because social media is deeply integrated into daily life, understanding these relationships can help communities evaluate both risks and benefits. These datasets rely on self-reported data, which may introduce bias. Therefore, results should be interpreted as exploratory rather than causal.
+
+## Data Context
+
+**Dataset 1: Social Media Usage and Emotional Well-Being**
+
+Dataset Link: https://www.kaggle.com/datasets/emirhanai/social-media-usage-and-emotional-well-being  
+Creator: Julian Emirhan Bulut  
+
+This dataset contains 103 observations and includes demographic variables such as age and gender, along with behavioral metrics including daily usage time, posts, likes, comments, messages, and dominant emotion. Each row represents one individual. The dataset was created in a survey-style format and is appropriate for exploratory analysis, though its relatively small sample size limits generalizability.
+
+**Dataset 2: Social Media and Mental Health Dataset**
+
+Dataset Link: https://bsos-data.umd.edu/dataset/social-media-and-mental-health  
+Source: University of Maryland (BSOS Data Repository)
+
+This dataset includes demographic information and validated mental health measures such as PHQ-9 and GAD-7 scores. Birth year is converted to age to align with the first dataset, and gender categories are standardized before joining.
+
+## Data Preparation
+
+::: {.column}
+**Data Preparation**
+
+This section demonstrates how the two datasets are combined and prepared for analysis.
+
+```{r}
+library(tidyverse)
+
+df1 <- read.csv("test.csv", header = TRUE)
+df2 <- read.csv("mental_health2425v8in.csv", header = TRUE)
+
+df2 <- df2 |>
+  mutate(Age = 2026 - year_1) |>
+  rename(Gender = sex)
+
+df1 <- df1 |>
+  mutate(Age = as.numeric(Age))
+df1 <- distinct(df1)
+
+combined_data <- left_join(df1, df2, by = c("Age", "Gender"))
+
+combined_data <- combined_data |>
+  mutate(
+    Total_Mental_Health = phq9_COMP + gad7_COMP,
+    Usage_Level = ifelse(
+      Daily_Usage_Time..minutes. >= median(Daily_Usage_Time..minutes., na.rm = TRUE),
+      "High",
+      "Low"
+    )
+  )
+
+combined_data <- combined_data |>
+  filter(!is.na(Daily_Usage_Time..minutes.),
+         !is.na(phq9_COMP),
+         !is.na(gad7_COMP))
+
+correlation_value <- cor(
+  combined_data$Daily_Usage_Time..minutes.,
+  combined_data$Total_Mental_Health
+)
+
+correlation_value
+```
+
+The correlation coefficient measures the strength and direction of the linear relationship between usage time and total mental health score.
+:::
+
+::: {.column}
+## Question 1: Usage vs Mental Health
+**Question 1: Is higher daily social media usage associated with worse overall mental health outcomes (measured by PHQ-9 + GAD-7 composite scores)?**
+
+This scatterplot helps evaluate whether increased social media usage is associated with worse mental health outcomes.
+Based on this visualization, there are more people sitting around the 50 - 120 Daily Minutes, and usually have around a score of 10 - 25 PHQ-9 and GAD-7 score. Higher daily social media usage is moderately associated with higher Total Mental Health scores
+
+```{r}
+ggplot(combined_data,
+       aes(x = Daily_Usage_Time..minutes.,
+           y = Total_Mental_Health)) +
+  geom_point(aes(color = Age), alpha = 0.6) +
+  labs(
+    title = "Social Media Usage vs Mental Health Score",
+    x = "Daily Usage (Minutes)",
+    y = "PHQ-9 + GAD-7 Score",
+    color = "Age",
+    caption = "Scatterplot shows relationship between daily social media usage and total mental health burden."
+  ) +
+  theme_minimal()
+```
+
+## Question 2: Usage by Emotion
+**Question 2: Does daily social media usage differ depending on a participant’s dominant emotion?**
+
+This boxplot compares usage across emotional categories. Users who report positive emotions (happy, relaxed) tend to spend more time on social media than those reporting negative emotions (bored, sad).
+
+```{r}
+ggplot(combined_data,
+       aes(x = Dominant_Emotion,
+           y = Daily_Usage_Time..minutes.,
+           fill = Dominant_Emotion)) +
+  geom_boxplot() +
+  labs(
+    title = "Daily Usage by Dominant Emotion",
+    x = "Dominant Emotion",
+    y = "Daily Usage (Minutes)",
+    caption = "Boxplots show median daily minutes by dominant emotion category."
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## Question 3: Mental Health by Usage Level
+**Question 3: Do people who use vs. don't use social media have differing levels of mental health?**
+
+This visualization compares high vs low usage groups. High activity social media users tend to have slightly higher mental health burden (PHQ-9 + GAD-7) than low activity users, but the difference is small.
+
+```{r}
+ggplot(combined_data,
+       aes(x = Usage_Level,
+           y = Total_Mental_Health,
+           fill = Usage_Level)) +
+  geom_boxplot() +
+  labs(
+    title = "Mental Health Score by Usage Level",
+    x = "Usage Level",
+    y = "Total Mental Health Score",
+    caption = "Boxplots compare total PHQ-9 + GAD-7 scores for high vs low usage groups."
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+:::
+
+## Conclusion 
+
+This project explores relationships between social media usage and mental health indicators. The correlation value and visualizations suggest an association between higher usage and mental health scores, though this does not imply causation.
+
+The analysis may underestimate real-world effects because the datasets rely on self-report data and a relatively small sample size. Additionally, the joining process may limit representativeness.
+
+Future work could involve larger datasets, additional demographic variables, longitudinal data, and more advanced modeling techniques to better understand relationships between online behavior and mental health outcomes.
